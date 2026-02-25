@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 BLE 控制器</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; background: #f0f2f5; }
+        .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        button { width: 100%; padding: 12px; margin: 10px 0; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        .btn-connect { background: #007bff; color: white; }
+        .btn-send { background: #28a745; color: white; }
+        input { width: 100%; padding: 10px; box-sizing: border-box; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        #status { font-size: 0.9rem; color: #666; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>ESP32 訊息發送</h2>
+    <button class="btn-connect" onclick="connectBle()">1. 連接藍牙裝置</button>
+    <hr>
+    <input type="text" id="msgInput" placeholder="輸入要傳送的文字..." value="Hello ESP32">
+    <button class="btn-send" onclick="sendData()" id="sendBtn" disabled>2. 發送訊息</button>
+    <div id="status">狀態: 尚未連線</div>
+</div>
+
+<script>
+    let device, server, characteristic;
+    // 請確保這裡的 UUID 與 ESP32 程式碼一致
+    const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
+    const CHARACTERISTIC_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+
+    async function connectBle() {
+        try {
+            document.getElementById('status').innerText = "正在搜尋裝置...";
+            device = await navigator.bluetooth.requestDevice({
+                filters: [{ namePrefix: 'ESP32' }],
+                optionalServices: [SERVICE_UUID]
+            });
+
+            server = await device.gatt.connect();
+            const service = await server.getPrimaryService(SERVICE_UUID);
+            characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+
+            document.getElementById('status').innerText = "連線成功: " + device.name;
+            document.getElementById('sendBtn').disabled = false;
+        } catch (error) {
+            console.error(error);
+            document.getElementById('status').innerText = "錯誤: " + error.message;
+        }
+    }
+
+    async function sendData() {
+        if (!characteristic) return;
+        const msg = document.getElementById('msgInput').value;
+        const encoder = new TextEncoder();
+        try {
+            await characteristic.writeValue(encoder.encode(msg));
+            alert("已發送: " + msg);
+        } catch (error) {
+            alert("發送失敗: " + error.message);
+        }
+    }
+</script>
+</body>
+</html>
