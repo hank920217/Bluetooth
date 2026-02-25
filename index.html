@@ -65,7 +65,6 @@
     try {
       setStatus('正在搜尋裝置...');
       device = await navigator.bluetooth.requestDevice({
-        filters: [{ namePrefix: 'ESP32' }],
         optionalServices: [SERVICE_UUID]
       });
 
