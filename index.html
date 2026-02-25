@@ -27,42 +27,59 @@
 </div>
 
 <script>
-    let device, server, characteristic;
-    // 請確保這裡的 UUID 與 ESP32 程式碼一致
-    const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
-    const CHARACTERISTIC_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+  let device = null, server = null, characteristic = null;
 
-    async function connectBle() {
-        try {
-            document.getElementById('status').innerText = "正在搜尋裝置...";
-            device = await navigator.bluetooth.requestDevice({
-                filters: [{ namePrefix: 'ESP32' }],
-                optionalServices: [SERVICE_UUID]
-            });
+  const SERVICE_UUID = '000000ff-0000-1000-8000-00805f9b34fb';
+  const CHARACTERISTIC_UUID = '0000ff01-0000-1000-8000-00805f9b34fb';
 
-            server = await device.gatt.connect();
-            const service = await server.getPrimaryService(SERVICE_UUID);
-            characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+  function setStatus(text) {
+    document.getElementById('status').innerText = text;
+  }
 
-            document.getElementById('status').innerText = "連線成功: " + device.name;
-            document.getElementById('sendBtn').disabled = false;
-        } catch (error) {
-            console.error(error);
-            document.getElementById('status').innerText = "錯誤: " + error.message;
-        }
+  async function connectBle() {
+    try {
+      setStatus('正在搜尋裝置...');
+      device = await navigator.bluetooth.requestDevice({
+        filters: [{ namePrefix: 'ESP32' }],
+        optionalServices: [SERVICE_UUID]
+      });
+
+      device.addEventListener('gattserverdisconnected', () => {
+        characteristic = null;
+        document.getElementById('sendBtn').disabled = true;
+        setStatus('已斷線');
+      });
+
+      server = await device.gatt.connect();
+      const service = await server.getPrimaryService(SERVICE_UUID);
+      characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+
+      document.getElementById('sendBtn').disabled = false;
+      setStatus('連線成功: ' + (device.name || 'ESP32'));
+    } catch (error) {
+      console.error(error);
+      setStatus('錯誤: ' + error.message);
     }
+  }
 
-    async function sendData() {
-        if (!characteristic) return;
-        const msg = document.getElementById('msgInput').value;
-        const encoder = new TextEncoder();
-        try {
-            await characteristic.writeValue(encoder.encode(msg));
-            alert("已發送: " + msg);
-        } catch (error) {
-            alert("發送失敗: " + error.message);
-        }
+  async function sendData() {
+    if (!characteristic) return;
+    const msg = document.getElementById('msgInput').value.trim();
+    if (!msg) return;
+
+    const data = new TextEncoder().encode(msg);
+    try {
+      if (characteristic.writeValueWithResponse) {
+        await characteristic.writeValueWithResponse(data);
+      } else {
+        await characteristic.writeValue(data);
+      }
+      alert('已發送: ' + msg);
+    } catch (error) {
+      alert('發送失敗: ' + error.message);
     }
+  }
 </script>
+
 </body>
 </html>
