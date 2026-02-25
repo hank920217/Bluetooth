@@ -65,7 +65,7 @@
     try {
       setStatus('正在搜尋裝置...');
       device = await navigator.bluetooth.requestDevice({
-        filters: [{ namePrefix: 'ESP32' }],
+        acceptAllDevices: true,
         optionalServices: [SERVICE_UUID]
       });
 
@@ -80,7 +80,7 @@
       characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
 
       setButtonsDisabled(false);
-      setStatus('連線成功: ' + (device.name || 'ESP32'));
+      setStatus('連線成功: ' + (device.name || '藍牙裝置'));
     } catch (error) {
       console.error(error);
       setStatus('錯誤: ' + error.message);
