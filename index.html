@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>閃燈控制器</title>
+    <title>ESP32 BLE 控制器</title>
     <link rel="manifest" href="manifest.json">
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; background: #f0f2f5; }
@@ -20,7 +20,7 @@
 <body>
 
 <div class="card">
-    <h2>訊息發送</h2>
+    <h2>ESP32 訊息發送</h2>
     <button class="btn-connect" onclick="connectBle()">1. 連接藍牙裝置</button>
     <hr>
     <input type="text" id="msgInput" placeholder="輸入要傳送的文字..." value="Hello ESP32">
@@ -65,7 +65,7 @@
     try {
       setStatus('正在搜尋裝置...');
       device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
+        filters: [{ namePrefix: 'maho' }],
         optionalServices: [SERVICE_UUID]
       });
 
@@ -80,7 +80,7 @@
       characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
 
       setButtonsDisabled(false);
-      setStatus('連線成功: ' + (device.name || '藍牙裝置'));
+      setStatus('連線成功: ' + (device.name || 'maho'));
     } catch (error) {
       console.error(error);
       setStatus('錯誤: ' + error.message);
