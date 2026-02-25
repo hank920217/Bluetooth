@@ -1,0 +1,15 @@
+{
+  "short_name": "BLE傳訊",
+  "name": "ESP32 藍牙發送器",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/100/100618.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "start_url": "./index.html",
+  "display": "standalone",
+  "theme_color": "#007bff",
+  "background_color": "#ffffff"
+}
