@@ -27,59 +27,94 @@
 </div>
 
 <script>
-  let device = null, server = null, characteristic = null;
+let device = null;
+let server = null;
+let characteristic = null;
 
-  const SERVICE_UUID = '000000ff-0000-1000-8000-00805f9b34fb';
-  const CHARACTERISTIC_UUID = '0000ff01-0000-1000-8000-00805f9b34fb';
+function setStatus(text) {
+  document.getElementById("status").innerText = text;
+}
 
-  function setStatus(text) {
-    document.getElementById('status').innerText = text;
+function onDisconnected() {
+  characteristic = null;
+  document.getElementById("sendBtn").disabled = true;
+  setStatus("已斷線");
+}
+
+// =====================
+// 連線
+// =====================
+async function connectBle() {
+  try {
+    setStatus("搜尋 ESP 裝置中...");
+
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: "ESP" }],
+      acceptAllDevices: false
+    });
+
+    device.addEventListener("gattserverdisconnected", onDisconnected);
+
+    setStatus("連線中: " + (device.name || "ESP"));
+    server = await device.gatt.connect();
+
+    characteristic = await findWritableCharacteristic(server);
+
+    document.getElementById("sendBtn").disabled = false;
+    setStatus("已連線: " + (device.name || "ESP") + " / 已找到可寫通道");
+
+  } catch (error) {
+    console.error(error);
+    setStatus("錯誤: " + error.message);
   }
+}
 
-  async function connectBle() {
-    try {
-      setStatus('正在搜尋裝置...');
-      device = await navigator.bluetooth.requestDevice({
-        filters: [{ namePrefix: 'ESP32' }],
-        optionalServices: [SERVICE_UUID]
-      });
+// =====================
+// 找可寫 characteristic（核心邏輯）
+// =====================
+async function findWritableCharacteristic(server) {
+  const services = await server.getPrimaryServices();
 
-      device.addEventListener('gattserverdisconnected', () => {
-        characteristic = null;
-        document.getElementById('sendBtn').disabled = true;
-        setStatus('已斷線');
-      });
+  for (const service of services) {
+    const chars = await service.getCharacteristics();
 
-      server = await device.gatt.connect();
-      const service = await server.getPrimaryService(SERVICE_UUID);
-      characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+    for (const ch of chars) {
+      const props = ch.properties;
 
-      document.getElementById('sendBtn').disabled = false;
-      setStatus('連線成功: ' + (device.name || 'ESP32'));
-    } catch (error) {
-      console.error(error);
-      setStatus('錯誤: ' + error.message);
-    }
-  }
-
-  async function sendData() {
-    if (!characteristic) return;
-    const msg = document.getElementById('msgInput').value.trim();
-    if (!msg) return;
-
-    const data = new TextEncoder().encode(msg);
-    try {
-      if (characteristic.writeValueWithResponse) {
-        await characteristic.writeValueWithResponse(data);
-      } else {
-        await characteristic.writeValue(data);
+      if (props.write || props.writeWithoutResponse) {
+        console.log("找到可寫 characteristic:", ch.uuid);
+        return ch;
       }
-      alert('已發送: ' + msg);
-    } catch (error) {
-      alert('發送失敗: ' + error.message);
     }
   }
-</script>
 
+  throw new Error("找不到可寫入的 BLE characteristic");
+}
+
+// =====================
+// 發送資料
+// =====================
+async function sendData() {
+  if (!characteristic) return;
+
+  const msg = document.getElementById("msgInput").value.trim();
+  if (!msg) return;
+
+  const data = new TextEncoder().encode(msg);
+
+  try {
+    if (characteristic.writeValueWithResponse) {
+      await characteristic.writeValueWithResponse(data);
+    } else {
+      await characteristic.writeValue(data);
+    }
+
+    alert("已發送: " + msg);
+
+  } catch (error) {
+    alert("發送失敗: " + error.message);
+  }
+}
+</script>
 </body>
 </html>
