@@ -11,6 +11,8 @@
         button { width: 100%; padding: 12px; margin: 10px 0; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }
         .btn-connect { background: #007bff; color: white; }
         .btn-send { background: #28a745; color: white; }
+        .preset-group { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+        .btn-preset { background: #ff9800; color: white; margin: 0; }
         input { width: 100%; padding: 10px; box-sizing: border-box; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; }
         #status { font-size: 0.9rem; color: #666; margin-top: 10px; }
     </style>
@@ -23,6 +25,11 @@
     <hr>
     <input type="text" id="msgInput" placeholder="輸入要傳送的文字..." value="Hello ESP32">
     <button class="btn-send" onclick="sendData()" id="sendBtn" disabled>2. 發送訊息</button>
+    <div class="preset-group">
+      <button class="btn-preset" onclick="sendPreset(1)" id="flash1Btn" disabled>閃一下</button>
+      <button class="btn-preset" onclick="sendPreset(2)" id="flash2Btn" disabled>閃兩下</button>
+      <button class="btn-preset" onclick="sendPreset(3)" id="flash3Btn" disabled>閃三下</button>
+    </div>
     <div id="status">狀態: 尚未連線</div>
 </div>
 
@@ -36,6 +43,24 @@
     document.getElementById('status').innerText = text;
   }
 
+  function setButtonsDisabled(disabled) {
+    document.getElementById('sendBtn').disabled = disabled;
+    document.getElementById('flash1Btn').disabled = disabled;
+    document.getElementById('flash2Btn').disabled = disabled;
+    document.getElementById('flash3Btn').disabled = disabled;
+  }
+
+  async function writeMessage(msg) {
+    if (!characteristic) return;
+
+    const data = new TextEncoder().encode(msg);
+    if (characteristic.writeValueWithResponse) {
+      await characteristic.writeValueWithResponse(data);
+    } else {
+      await characteristic.writeValue(data);
+    }
+  }
+
   async function connectBle() {
     try {
       setStatus('正在搜尋裝置...');
@@ -46,7 +71,7 @@
 
       device.addEventListener('gattserverdisconnected', () => {
         characteristic = null;
-        document.getElementById('sendBtn').disabled = true;
+        setButtonsDisabled(true);
         setStatus('已斷線');
       });
 
@@ -54,7 +79,7 @@
       const service = await server.getPrimaryService(SERVICE_UUID);
       characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
 
-      document.getElementById('sendBtn').disabled = false;
+      setButtonsDisabled(false);
       setStatus('連線成功: ' + (device.name || 'ESP32'));
     } catch (error) {
       console.error(error);
@@ -67,14 +92,20 @@
     const msg = document.getElementById('msgInput').value.trim();
     if (!msg) return;
 
-    const data = new TextEncoder().encode(msg);
     try {
-      if (characteristic.writeValueWithResponse) {
-        await characteristic.writeValueWithResponse(data);
-      } else {
-        await characteristic.writeValue(data);
-      }
+      await writeMessage(msg);
       alert('已發送: ' + msg);
+    } catch (error) {
+      alert('發送失敗: ' + error.message);
+    }
+  }
+
+  async function sendPreset(number) {
+    if (!characteristic) return;
+
+    try {
+      await writeMessage(String(number));
+      setStatus('已發送數字: ' + number);
     } catch (error) {
       alert('發送失敗: ' + error.message);
     }
