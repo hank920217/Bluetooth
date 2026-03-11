@@ -14,6 +14,7 @@
     padding: 20px;
     background: #f0f2f5;
   }
+
   .card {
     background: white;
     padding: 2rem;
@@ -22,6 +23,7 @@
     width: 100%;
     max-width: 420px;
   }
+
   button {
     width: 100%;
     padding: 12px;
@@ -32,16 +34,24 @@
     font-size: 16px;
     font-weight: bold;
   }
-  .btn-connect { background:#007bff;color:white; }
-  .btn-auth { background:#9c27b0;color:white; }
-  .btn-send { background:#28a745;color:white; }
+
+  .btn-connect { background:#007bff; color:white; }
+  .btn-auth { background:#9c27b0; color:white; }
+  .btn-send { background:#28a745; color:white; }
+
   .preset-group {
     display:grid;
     grid-template-columns:repeat(3,1fr);
     gap:10px;
     margin-top:12px;
   }
-  .btn-preset { background:#ff9800;color:white;margin:0; }
+
+  .btn-preset {
+    background:#ff9800;
+    color:white;
+    margin:0;
+  }
+
   input {
     width:100%;
     padding:10px;
@@ -50,6 +60,7 @@
     border:1px solid #ddd;
     border-radius:4px;
   }
+
   #status {
     font-size:0.9rem;
     color:#666;
@@ -57,6 +68,7 @@
     line-height:1.5;
     white-space:pre-line;
   }
+
   #deviceList {
     margin-top:10px;
     background:#fafafa;
@@ -65,43 +77,104 @@
     padding:10px;
     font-size:0.9rem;
   }
+
+  /* Modal */
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.45);
+    justify-content: center;
+    align-items: center;
+  }
+
+  .modal.show {
+    display: flex;
+  }
+
+  .modal-content {
+    background: #fff;
+    width: 90%;
+    max-width: 320px;
+    border-radius: 14px;
+    padding: 24px 20px;
+    text-align: center;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+  }
+
+  .modal-title {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+
+  .modal-message {
+    font-size: 15px;
+    color: #555;
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+
+  .modal-success .modal-title {
+    color: #28a745;
+  }
+
+  .modal-error .modal-title {
+    color: #dc3545;
+  }
+
+  .modal-btn {
+    background: #007bff;
+    color: white;
+    margin: 0;
+  }
 </style>
 </head>
 
 <body>
 
 <div class="card">
+  <h2>MAHO</h2>
 
-<h2>MAHO</h2>
+  <button class="btn-connect" onclick="connectBle()">1. 連接藍牙裝置</button>
 
-<button class="btn-connect" onclick="connectBle()">1. 連接藍牙裝置</button>
+  <hr>
 
-<hr>
+  <input id="authInput" placeholder="輸入連線碼" value="123456">
+  <button class="btn-auth" onclick="authDevices()">2. 驗證裝置</button>
 
-<input id="authInput" placeholder="輸入連線碼" value="123456">
-<button class="btn-auth" onclick="authDevices()">2. 驗證裝置</button>
+  <hr>
 
-<hr>
+  <input id="msgInput" placeholder="輸入要傳送的文字..." value="Hello">
 
-<input id="msgInput" placeholder="輸入要傳送的文字..." value="Hello">
+  <button class="btn-send" onclick="sendData()" id="sendBtn" disabled>
+    3. 發送訊息
+  </button>
 
-<button class="btn-send" onclick="sendData()" id="sendBtn" disabled>
-3. 發送訊息
-</button>
+  <div class="preset-group">
+    <button class="btn-preset" onclick="sendPreset(1)" id="flash1Btn" disabled>閃一下</button>
+    <button class="btn-preset" onclick="sendPreset(2)" id="flash2Btn" disabled>閃兩下</button>
+    <button class="btn-preset" onclick="sendPreset(3)" id="flash3Btn" disabled>閃三下</button>
+  </div>
 
-<div class="preset-group">
-  <button class="btn-preset" onclick="sendPreset(1)" id="flash1Btn" disabled>閃一下</button>
-  <button class="btn-preset" onclick="sendPreset(2)" id="flash2Btn" disabled>閃兩下</button>
-  <button class="btn-preset" onclick="sendPreset(3)" id="flash3Btn" disabled>閃三下</button>
+  <div id="status">狀態: 尚未連線</div>
+  <div id="deviceList">已連線裝置: 0</div>
 </div>
 
-<div id="status">狀態: 尚未連線</div>
-<div id="deviceList">已連線裝置: 0</div>
-
+<!-- Modal -->
+<div id="resultModal" class="modal">
+  <div id="modalBox" class="modal-content">
+    <div id="modalTitle" class="modal-title">提示</div>
+    <div id="modalMessage" class="modal-message">內容</div>
+    <button class="modal-btn" onclick="closeModal()">確定</button>
+  </div>
 </div>
 
 <script>
-
 const SERVICE_UUID = "000000ff-0000-1000-8000-00805f9b34fb";
 const CHARACTERISTIC_UUID = "0000ff01-0000-1000-8000-00805f9b34fb";
 
@@ -124,9 +197,24 @@ function updateDeviceList(){
     "已連線裝置: " + devices.length;
 }
 
+function showModal(type, title, message) {
+  const modal = document.getElementById("resultModal");
+  const box = document.getElementById("modalBox");
+  const titleEl = document.getElementById("modalTitle");
+  const msgEl = document.getElementById("modalMessage");
+
+  box.className = "modal-content " + (type === "success" ? "modal-success" : "modal-error");
+  titleEl.innerText = title;
+  msgEl.innerText = message;
+  modal.classList.add("show");
+}
+
+function closeModal() {
+  document.getElementById("resultModal").classList.remove("show");
+}
+
 async function connectBle(){
   try{
-
     setStatus("搜尋裝置...");
 
     const device = await navigator.bluetooth.requestDevice({
@@ -147,74 +235,111 @@ async function connectBle(){
     device.addEventListener("gattserverdisconnected",()=>{
       devices = devices.filter(d=>d.device.id!==device.id);
       updateDeviceList();
+      if (devices.length === 0) {
+        authenticated = false;
+        setButtonsDisabled(true);
+      }
       setStatus("裝置斷線");
     });
 
     updateDeviceList();
-    setStatus("已連線裝置: "+devices.length);
+    setStatus("已連線裝置: " + devices.length);
 
   }catch(error){
-    setStatus("錯誤: "+error.message);
+    setStatus("錯誤: " + error.message);
+    showModal("error", "連線失敗", error.message);
   }
 }
 
 async function writeMessage(msg){
+  if (devices.length === 0) {
+    throw new Error("目前沒有已連線裝置");
+  }
 
   const data = new TextEncoder().encode(msg);
 
   for(const d of devices){
-    try{
-      if(d.characteristic.writeValueWithResponse){
-        await d.characteristic.writeValueWithResponse(data);
-      }else{
-        await d.characteristic.writeValue(data);
-      }
-    }catch(e){
-      console.log("send fail",e);
+    if(d.characteristic.writeValueWithResponse){
+      await d.characteristic.writeValueWithResponse(data);
+    }else{
+      await d.characteristic.writeValue(data);
     }
   }
-
 }
 
 async function authDevices(){
+  try {
+    const code = document.getElementById("authInput").value.trim();
+    if(!code) {
+      showModal("error", "驗證失敗", "請先輸入連線碼");
+      return;
+    }
 
-  const code = document.getElementById("authInput").value.trim();
-  if(!code) return;
+    if (devices.length === 0) {
+      showModal("error", "驗證失敗", "目前沒有已連線裝置");
+      return;
+    }
 
-  await writeMessage("AUTH:"+code);
+    await writeMessage("AUTH:" + code);
 
-  authenticated = true;
-  setButtonsDisabled(false);
+    // 這裡先假設送出即視為驗證成功
+    // 若之後要做真正回傳確認，可再加 notify 機制
+    authenticated = true;
+    setButtonsDisabled(false);
+    setStatus("裝置已驗證");
 
-  setStatus("裝置已驗證");
+    showModal("success", "驗證成功", "裝置已成功驗證，現在可以開始操作。");
 
+  } catch (error) {
+    authenticated = false;
+    setButtonsDisabled(true);
+    setStatus("驗證失敗: " + error.message);
+
+    showModal("error", "驗證失敗", error.message);
+  }
 }
 
 async function sendData(){
-
-  if(!authenticated) return;
+  if(!authenticated) {
+    showModal("error", "尚未驗證", "請先完成裝置驗證。");
+    return;
+  }
 
   const msg = document.getElementById("msgInput").value.trim();
   if(!msg) return;
 
-  await writeMessage(msg);
-
-  setStatus("已發送: "+msg);
-
+  try {
+    await writeMessage(msg);
+    setStatus("已發送: " + msg);
+  } catch (error) {
+    setStatus("發送失敗: " + error.message);
+    showModal("error", "發送失敗", error.message);
+  }
 }
 
 async function sendPreset(num){
+  if(!authenticated) {
+    showModal("error", "尚未驗證", "請先完成裝置驗證。");
+    return;
+  }
 
-  if(!authenticated) return;
-
-  await writeMessage(String(num));
-
-  setStatus("已發送閃燈指令: "+num);
-
+  try {
+    await writeMessage(String(num));
+    setStatus("已發送閃燈指令: " + num);
+  } catch (error) {
+    setStatus("發送失敗: " + error.message);
+    showModal("error", "發送失敗", error.message);
+  }
 }
 
 setButtonsDisabled(true);
 
+// 點背景可關閉彈窗
+document.getElementById("resultModal").addEventListener("click", function(e){
+  if(e.target.id === "resultModal"){
+    closeModal();
+  }
+});
 </script>
 
 </body>
