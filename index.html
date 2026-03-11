@@ -1,43 +1,132 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>閃燈控制器</title>
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="manifest.json" />
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; background: #f0f2f5; }
-        .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
-        button { width: 100%; padding: 12px; margin: 10px 0; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }
-        .btn-connect { background: #007bff; color: white; }
-        .btn-send { background: #28a745; color: white; }
-        .preset-group { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
-        .btn-preset { background: #ff9800; color: white; margin: 0; }
-        input { width: 100%; padding: 10px; box-sizing: border-box; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; }
-        #status { font-size: 0.9rem; color: #666; margin-top: 10px; }
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background: #f0f2f5;
+        }
+
+        .card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 420px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .btn-connect {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-send {
+            background: #28a745;
+            color: white;
+        }
+
+        .preset-group {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .btn-preset {
+            background: #ff9800;
+            color: white;
+            margin: 0;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        #status {
+            font-size: 0.95rem;
+            color: #666;
+            margin-top: 10px;
+            line-height: 1.5;
+            white-space: pre-line;
+        }
+
+        #deviceList {
+            margin-top: 12px;
+            font-size: 0.9rem;
+            color: #333;
+            background: #fafafa;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        #deviceList ul {
+            margin: 8px 0 0 18px;
+            padding: 0;
+        }
     </style>
 </head>
 <body>
 
 <div class="card">
     <h2>MAHO</h2>
+
     <button class="btn-connect" onclick="connectBle()">1. 連接藍牙裝置</button>
-    <hr>
-    <input type="text" id="msgInput" placeholder="輸入要傳送的文字..." value="Hello">
-    <button class="btn-send" onclick="sendData()" id="sendBtn" disabled>2. 發送訊息</button>
+
+    <hr />
+
+    <input
+        type="text"
+        id="msgInput"
+        placeholder="輸入要傳送的文字..."
+        value="Hello"
+    />
+
+    <button class="btn-send" onclick="sendData()" id="sendBtn" disabled>
+        2. 發送訊息
+    </button>
+
     <div class="preset-group">
-      <button class="btn-preset" onclick="sendPreset(1)" id="flash1Btn" disabled>閃一下</button>
-      <button class="btn-preset" onclick="sendPreset(2)" id="flash2Btn" disabled>閃兩下</button>
-      <button class="btn-preset" onclick="sendPreset(3)" id="flash3Btn" disabled>閃三下</button>
+        <button class="btn-preset" onclick="sendPreset(1)" id="flash1Btn" disabled>閃一下</button>
+        <button class="btn-preset" onclick="sendPreset(2)" id="flash2Btn" disabled>閃兩下</button>
+        <button class="btn-preset" onclick="sendPreset(3)" id="flash3Btn" disabled>閃三下</button>
     </div>
+
     <div id="status">狀態: 尚未連線</div>
+    <div id="deviceList">已連線裝置：0 台</div>
 </div>
 
 <script>
-  let device = null, server = null, characteristic = null;
-
   const SERVICE_UUID = '000000ff-0000-1000-8000-00805f9b34fb';
   const CHARACTERISTIC_UUID = '0000ff01-0000-1000-8000-00805f9b34fb';
+
+  // 所有已連線裝置都放這裡
+  let devices = [];
 
   function setStatus(text) {
     document.getElementById('status').innerText = text;
@@ -50,66 +139,143 @@
     document.getElementById('flash3Btn').disabled = disabled;
   }
 
+  function updateButtonsState() {
+    setButtonsDisabled(devices.length === 0);
+  }
+
+  function updateDeviceList() {
+    const box = document.getElementById('deviceList');
+
+    if (devices.length === 0) {
+      box.innerHTML = '已連線裝置：0 台';
+      return;
+    }
+
+    const listHtml = devices.map((d, index) => {
+      const name = d.device?.name || `裝置 ${index + 1}`;
+      return `<li>${name}</li>`;
+    }).join('');
+
+    box.innerHTML = `
+      已連線裝置：${devices.length} 台
+      <ul>${listHtml}</ul>
+    `;
+  }
+
+  function isAlreadyConnected(deviceId) {
+    return devices.some(d => d.device && d.device.id === deviceId);
+  }
+
+  function removeDevice(deviceId) {
+    devices = devices.filter(d => d.device && d.device.id !== deviceId);
+    updateButtonsState();
+    updateDeviceList();
+
+    if (devices.length === 0) {
+      setStatus('狀態: 已全部斷線');
+    } else {
+      setStatus(`狀態: 剩餘 ${devices.length} 台裝置連線中`);
+    }
+  }
+
   async function writeMessage(msg) {
-    if (!characteristic) return;
+    if (devices.length === 0) {
+      throw new Error('目前沒有任何已連線裝置');
+    }
 
     const data = new TextEncoder().encode(msg);
-    if (characteristic.writeValueWithResponse) {
-      await characteristic.writeValueWithResponse(data);
-    } else {
-      await characteristic.writeValue(data);
+    const failedDevices = [];
+
+    for (const item of devices) {
+      try {
+        if (item.characteristic.writeValueWithResponse) {
+          await item.characteristic.writeValueWithResponse(data);
+        } else {
+          await item.characteristic.writeValue(data);
+        }
+      } catch (error) {
+        console.error('寫入失敗:', item.device?.name, error);
+        failedDevices.push(item.device?.name || '未知裝置');
+      }
+    }
+
+    if (failedDevices.length > 0) {
+      throw new Error('部分裝置發送失敗：' + failedDevices.join('、'));
     }
   }
 
   async function connectBle() {
     try {
-      setStatus('正在搜尋裝置...');
-      device = await navigator.bluetooth.requestDevice({
+      setStatus('狀態: 正在搜尋裝置...');
+
+      const device = await navigator.bluetooth.requestDevice({
         filters: [{ namePrefix: 'maho' }],
         optionalServices: [SERVICE_UUID]
       });
 
-      device.addEventListener('gattserverdisconnected', () => {
-        characteristic = null;
-        setButtonsDisabled(true);
-        setStatus('已斷線');
+      if (isAlreadyConnected(device.id)) {
+        setStatus(`狀態: ${device.name || '裝置'} 已經連線過了`);
+        return;
+      }
+
+      const disconnectHandler = () => {
+        console.log('裝置已斷線:', device.name);
+        removeDevice(device.id);
+      };
+
+      device.addEventListener('gattserverdisconnected', disconnectHandler);
+
+      const server = await device.gatt.connect();
+      const service = await server.getPrimaryService(SERVICE_UUID);
+      const characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+
+      devices.push({
+        device,
+        server,
+        characteristic
       });
 
-      server = await device.gatt.connect();
-      const service = await server.getPrimaryService(SERVICE_UUID);
-      characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
-
-      setButtonsDisabled(false);
-      setStatus('連線成功: ' + (device.name || 'maho'));
+      updateButtonsState();
+      updateDeviceList();
+      setStatus(`狀態: 連線成功，目前共 ${devices.length} 台裝置`);
     } catch (error) {
       console.error(error);
+
+      if (error && (error.name === 'NotFoundError' || /cancelled/i.test(error.message))) {
+        setStatus('狀態: 已取消裝置選擇');
+        return;
+      }
+
       setStatus('錯誤: ' + error.message);
     }
   }
 
   async function sendData() {
-    if (!characteristic) return;
     const msg = document.getElementById('msgInput').value.trim();
     if (!msg) return;
 
     try {
       await writeMessage(msg);
-      alert('已發送: ' + msg);
+      setStatus(`狀態: 已發送訊息到 ${devices.length} 台裝置`);
     } catch (error) {
       alert('發送失敗: ' + error.message);
+      setStatus('錯誤: ' + error.message);
     }
   }
 
   async function sendPreset(number) {
-    if (!characteristic) return;
-
     try {
       await writeMessage(String(number));
-      setStatus('已發送數字: ' + number);
+      setStatus(`狀態: 已發送數字 ${number} 到 ${devices.length} 台裝置`);
     } catch (error) {
       alert('發送失敗: ' + error.message);
+      setStatus('錯誤: ' + error.message);
     }
   }
+
+  // 初始化按鈕狀態
+  updateButtonsState();
+  updateDeviceList();
 </script>
 
 </body>
