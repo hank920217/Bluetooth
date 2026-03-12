@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>閃燈控制器</title>
-  <link rel="manifest" href="manifest.json" />
   <style>
     body {
       font-family: sans-serif;
@@ -133,13 +132,8 @@
       box-sizing: border-box;
     }
 
-    .modal-success .modal-title {
-      color: #28a745;
-    }
-
-    .modal-error .modal-title {
-      color: #dc3545;
-    }
+    .modal-success .modal-title { color: #28a745; }
+    .modal-error .modal-title { color: #dc3545; }
 
     .modal-btn {
       background: #007bff;
@@ -178,17 +172,15 @@
   <div id="deviceList">已連線裝置：0 台</div>
 </div>
 
-<!-- 驗證碼輸入視窗 -->
 <div id="authModal" class="modal">
   <div class="modal-content">
     <div class="modal-title">輸入驗證碼</div>
-    <div class="modal-message">請輸入裝置驗證碼後按確認</div>
+    <div class="modal-message">請輸入所有裝置共用的驗證碼</div>
     <input id="authCodeInput" class="modal-input" type="password" placeholder="請輸入驗證碼" />
     <button class="modal-btn" onclick="submitAuthCode()">確認</button>
   </div>
 </div>
 
-<!-- 結果視窗 -->
 <div id="resultModal" class="modal">
   <div id="resultBox" class="modal-content">
     <div id="resultTitle" class="modal-title">提示</div>
@@ -202,8 +194,10 @@
   const CHARACTERISTIC_UUID = '0000ff01-0000-1000-8000-00805f9b34fb';
 
   let devices = [];
-  let authenticated = false;
-  let pendingAuth = false;
+  let waitingAuth = false;
+  let authExpectedCount = 0;
+  let authOkCount = 0;
+  let authFailCount = 0;
   let lastAuthResult = null;
 
   function setStatus(text) {
@@ -217,8 +211,12 @@
     document.getElementById('flash3Btn').disabled = disabled;
   }
 
+  function allAuthed() {
+    return devices.length > 0 && devices.every(d => d.isAuthed === true);
+  }
+
   function updateButtonsState() {
-    setButtonsDisabled(!(devices.length > 0 && authenticated));
+    setButtonsDisabled(!allAuthed());
   }
 
   function updateDeviceList() {
@@ -231,7 +229,8 @@
 
     const listHtml = devices.map((d, index) => {
       const name = d.device?.name || `裝置 ${index + 1}`;
-      return `<li>${name}</li>`;
+      const authText = d.isAuthed ? '已驗證' : '未驗證';
+      return `<li>${name} - ${authText}</li>`;
     }).join('');
 
     box.innerHTML = `
@@ -257,7 +256,6 @@
     const box = document.getElementById('resultBox');
     document.getElementById('resultTitle').innerText = title;
     document.getElementById('resultMessage').innerText = message;
-
     box.className = 'modal-content ' + (type === 'success' ? 'modal-success' : 'modal-error');
     modal.classList.add('show');
   }
@@ -268,7 +266,6 @@
 
   function handleResultConfirm() {
     closeResultModal();
-
     if (lastAuthResult === 'fail') {
       showAuthModal();
     }
@@ -278,16 +275,14 @@
     return devices.some(d => d.device && d.device.id === deviceId);
   }
 
+  function findDeviceByCharacteristic(ch) {
+    return devices.find(d => d.characteristic === ch);
+  }
+
   function removeDevice(deviceId) {
     devices = devices.filter(d => d.device && d.device.id !== deviceId);
-
-    if (devices.length === 0) {
-      authenticated = false;
-      pendingAuth = false;
-    }
-
-    updateButtonsState();
     updateDeviceList();
+    updateButtonsState();
 
     if (devices.length === 0) {
       setStatus('狀態: 已全部斷線');
@@ -313,35 +308,69 @@
   }
 
   function handleNotifyValue(event) {
-    const value = new TextDecoder().decode(event.target.value);
-    console.log('Notify:', value);
+    const ch = event.target;
+    const value = new TextDecoder().decode(ch.value);
+    const deviceObj = findDeviceByCharacteristic(ch);
+
+    if (!deviceObj) return;
+
+    console.log('Notify from', deviceObj.device?.name, value);
 
     if (value === 'AUTH_OK') {
-      authenticated = true;
-      pendingAuth = false;
-      lastAuthResult = 'success';
-      closeAuthModal();
+      deviceObj.isAuthed = true;
+
+      if (waitingAuth) {
+        authOkCount++;
+        if (authOkCount + authFailCount >= authExpectedCount) {
+          waitingAuth = false;
+          updateDeviceList();
+          updateButtonsState();
+
+          if (authFailCount === 0 && allAuthed()) {
+            lastAuthResult = 'success';
+            closeAuthModal();
+            setStatus('狀態: 所有裝置驗證成功');
+            showResultModal('success', '驗證成功', '所有已連線裝置都驗證成功。');
+          } else {
+            lastAuthResult = 'fail';
+            closeAuthModal();
+            setStatus('狀態: 部分裝置驗證失敗');
+            showResultModal('error', '驗證失敗', '部分裝置驗證失敗，請重新輸入驗證碼。');
+          }
+        }
+      }
+
+      updateDeviceList();
       updateButtonsState();
-      setStatus('狀態: 驗證成功');
-      showResultModal('success', '驗證成功', '裝置已成功驗證。');
       return;
     }
 
     if (value === 'AUTH_FAIL') {
-      authenticated = false;
-      pendingAuth = false;
-      lastAuthResult = 'fail';
+      deviceObj.isAuthed = false;
+
+      if (waitingAuth) {
+        authFailCount++;
+        if (authOkCount + authFailCount >= authExpectedCount) {
+          waitingAuth = false;
+          updateDeviceList();
+          updateButtonsState();
+
+          lastAuthResult = 'fail';
+          closeAuthModal();
+          setStatus('狀態: 部分裝置驗證失敗');
+          showResultModal('error', '驗證失敗', '部分裝置驗證失敗，請重新輸入驗證碼。');
+        }
+      }
+
+      updateDeviceList();
       updateButtonsState();
-      closeAuthModal();
-      setStatus('狀態: 驗證失敗');
-      showResultModal('error', '驗證失敗', '驗證碼錯誤，請重新輸入。');
       return;
     }
 
     if (value === 'AUTH_REQUIRED') {
-      authenticated = false;
+      deviceObj.isAuthed = false;
+      updateDeviceList();
       updateButtonsState();
-      setStatus('狀態: 尚未驗證');
     }
   }
 
@@ -367,26 +396,20 @@
       characteristic.addEventListener('characteristicvaluechanged', handleNotifyValue);
 
       const disconnectHandler = () => {
-        console.log('裝置已斷線:', device.name);
         removeDevice(device.id);
       };
-
       device.addEventListener('gattserverdisconnected', disconnectHandler);
 
       devices.push({
         device,
         server,
-        characteristic
+        characteristic,
+        isAuthed: false
       });
 
-      authenticated = false;
-      pendingAuth = false;
-      updateButtonsState();
       updateDeviceList();
+      updateButtonsState();
       setStatus(`狀態: 連線成功，目前共 ${devices.length} 台裝置`);
-
-      // 連線成功後立刻跳輸入視窗
-      showAuthModal();
 
     } catch (error) {
       console.error(error);
@@ -403,6 +426,7 @@
 
   async function submitAuthCode() {
     const code = document.getElementById('authCodeInput').value.trim();
+
     if (!code) {
       showResultModal('error', '驗證失敗', '請輸入驗證碼。');
       return;
@@ -414,52 +438,20 @@
     }
 
     try {
-      pendingAuth = true;
-      setStatus('狀態: 正在驗證...');
+      for (const d of devices) {
+        d.isAuthed = false;
+      }
+      updateDeviceList();
+      updateButtonsState();
+
+      waitingAuth = true;
+      authExpectedCount = devices.length;
+      authOkCount = 0;
+      authFailCount = 0;
+
+      setStatus(`狀態: 正在驗證 ${devices.length} 台裝置...`);
       await writeToAll('AUTH:' + code);
+
     } catch (error) {
-      pendingAuth = false;
-      setStatus('錯誤: ' + error.message);
-      showResultModal('error', '驗證失敗', error.message);
-    }
-  }
-
-  async function sendData() {
-    const msg = document.getElementById('msgInput').value.trim();
-    if (!msg) return;
-
-    if (!authenticated) {
-      showResultModal('error', '尚未驗證', '請先完成裝置驗證。');
-      return;
-    }
-
-    try {
-      await writeToAll(msg);
-      setStatus(`狀態: 已發送訊息到 ${devices.length} 台裝置`);
-    } catch (error) {
-      setStatus('錯誤: ' + error.message);
-      showResultModal('error', '發送失敗', error.message);
-    }
-  }
-
-  async function sendPreset(number) {
-    if (!authenticated) {
-      showResultModal('error', '尚未驗證', '請先完成裝置驗證。');
-      return;
-    }
-
-    try {
-      await writeToAll(String(number));
-      setStatus(`狀態: 已發送數字 ${number} 到 ${devices.length} 台裝置`);
-    } catch (error) {
-      setStatus('錯誤: ' + error.message);
-      showResultModal('error', '發送失敗', error.message);
-    }
-  }
-
-  updateButtonsState();
-  updateDeviceList();
-</script>
-
-</body>
-</html>
+      waitingAuth = false;
+      setStatus('
