@@ -1,43 +1,204 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 BLE 控制器</title>
-    <link rel="manifest" href="manifest.json">
-    <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; background: #f0f2f5; }
-        .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
-        button { width: 100%; padding: 12px; margin: 10px 0; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }
-        .btn-connect { background: #007bff; color: white; }
-        .btn-send { background: #28a745; color: white; }
-        .preset-group { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
-        .btn-preset { background: #ff9800; color: white; margin: 0; }
-        input { width: 100%; padding: 10px; box-sizing: border-box; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; }
-        #status { font-size: 0.9rem; color: #666; margin-top: 10px; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>閃燈控制器</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      background: #f0f2f5;
+    }
+
+    .card {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 420px;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    .btn-connect { background: #007bff; color: white; }
+    .btn-send { background: #28a745; color: white; }
+
+    .preset-group {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .btn-preset {
+      background: #ff9800;
+      color: white;
+      margin: 0;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      box-sizing: border-box;
+      margin-bottom: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+
+    #status {
+      font-size: 0.9rem;
+      color: #666;
+      margin-top: 10px;
+      line-height: 1.5;
+      white-space: pre-line;
+    }
+
+    #deviceList {
+      margin-top: 12px;
+      font-size: 0.9rem;
+      color: #333;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    #deviceList ul {
+      margin: 8px 0 0 18px;
+      padding: 0;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 9999;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.45);
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #fff;
+      width: 90%;
+      max-width: 340px;
+      border-radius: 14px;
+      padding: 24px 20px;
+      text-align: center;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    }
+
+    .modal-title {
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    .modal-message {
+      font-size: 15px;
+      color: #555;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .modal-input {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 16px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+
+    .modal-success .modal-title { color: #28a745; }
+    .modal-error .modal-title { color: #dc3545; }
+
+    .modal-btn {
+      background: #007bff;
+      color: white;
+      margin: 0;
+    }
+  </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>ESP32 訊息發送</h2>
-    <button class="btn-connect" onclick="connectBle()">1. 連接藍牙裝置</button>
-    <hr>
-    <input type="text" id="msgInput" placeholder="輸入要傳送的文字..." value="Hello ESP32">
-    <button class="btn-send" onclick="sendData()" id="sendBtn" disabled>2. 發送訊息</button>
-    <div class="preset-group">
-      <button class="btn-preset" onclick="sendPreset(1)" id="flash1Btn" disabled>閃一下</button>
-      <button class="btn-preset" onclick="sendPreset(2)" id="flash2Btn" disabled>閃兩下</button>
-      <button class="btn-preset" onclick="sendPreset(3)" id="flash3Btn" disabled>閃三下</button>
-    </div>
-    <div id="status">狀態: 尚未連線</div>
+  <h2>MAHO</h2>
+
+  <button class="btn-connect" onclick="connectBle()">1. 連接藍牙裝置</button>
+
+  <hr />
+
+  <input
+    type="text"
+    id="msgInput"
+    placeholder="輸入要傳送的文字..."
+    value="Hello"
+  />
+
+  <button class="btn-send" onclick="sendData()" id="sendBtn" disabled>
+    2. 發送訊息
+  </button>
+
+  <div class="preset-group">
+    <button class="btn-preset" onclick="sendPreset(1)" id="flash1Btn" disabled>閃一下</button>
+    <button class="btn-preset" onclick="sendPreset(2)" id="flash2Btn" disabled>閃兩下</button>
+    <button class="btn-preset" onclick="sendPreset(3)" id="flash3Btn" disabled>閃三下</button>
+  </div>
+
+  <div id="status">狀態: 尚未連線</div>
+  <div id="deviceList">已連線裝置：0 台</div>
+</div>
+
+<div id="authModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-title">輸入驗證碼</div>
+    <div class="modal-message">請輸入所有裝置共用的驗證碼</div>
+    <input id="authCodeInput" class="modal-input" type="password" placeholder="請輸入驗證碼" />
+    <button class="modal-btn" onclick="submitAuthCode()">確認</button>
+  </div>
+</div>
+
+<div id="resultModal" class="modal">
+  <div id="resultBox" class="modal-content">
+    <div id="resultTitle" class="modal-title">提示</div>
+    <div id="resultMessage" class="modal-message">內容</div>
+    <button class="modal-btn" onclick="handleResultConfirm()">確認</button>
+  </div>
 </div>
 
 <script>
-  let device = null, server = null, characteristic = null;
-
   const SERVICE_UUID = '000000ff-0000-1000-8000-00805f9b34fb';
   const CHARACTERISTIC_UUID = '0000ff01-0000-1000-8000-00805f9b34fb';
+
+  let devices = [];
+  let waitingAuth = false;
+  let authExpectedCount = 0;
+  let authOkCount = 0;
+  let authFailCount = 0;
+  let lastAuthResult = null;
 
   function setStatus(text) {
     document.getElementById('status').innerText = text;
@@ -50,67 +211,247 @@
     document.getElementById('flash3Btn').disabled = disabled;
   }
 
-  async function writeMessage(msg) {
-    if (!characteristic) return;
+  function allAuthed() {
+    return devices.length > 0 && devices.every(d => d.isAuthed === true);
+  }
+
+  function updateButtonsState() {
+    setButtonsDisabled(!allAuthed());
+  }
+
+  function updateDeviceList() {
+    const box = document.getElementById('deviceList');
+
+    if (devices.length === 0) {
+      box.innerHTML = '已連線裝置：0 台';
+      return;
+    }
+
+    const listHtml = devices.map((d, index) => {
+      const name = d.device?.name || `裝置 ${index + 1}`;
+      const authText = d.isAuthed ? '已驗證' : '未驗證';
+      return `<li>${name} - ${authText}</li>`;
+    }).join('');
+
+    box.innerHTML = `
+      已連線裝置：${devices.length} 台
+      <ul>${listHtml}</ul>
+    `;
+  }
+
+  function showAuthModal() {
+    document.getElementById('authCodeInput').value = '';
+    document.getElementById('authModal').classList.add('show');
+    setTimeout(() => {
+      document.getElementById('authCodeInput').focus();
+    }, 50);
+  }
+
+  function closeAuthModal() {
+    document.getElementById('authModal').classList.remove('show');
+  }
+
+  function showResultModal(type, title, message) {
+    const modal = document.getElementById('resultModal');
+    const box = document.getElementById('resultBox');
+    document.getElementById('resultTitle').innerText = title;
+    document.getElementById('resultMessage').innerText = message;
+    box.className = 'modal-content ' + (type === 'success' ? 'modal-success' : 'modal-error');
+    modal.classList.add('show');
+  }
+
+  function closeResultModal() {
+    document.getElementById('resultModal').classList.remove('show');
+  }
+
+  function handleResultConfirm() {
+    closeResultModal();
+    if (lastAuthResult === 'fail') {
+      showAuthModal();
+    }
+  }
+
+  function isAlreadyConnected(deviceId) {
+    return devices.some(d => d.device && d.device.id === deviceId);
+  }
+
+  function findDeviceByCharacteristic(ch) {
+    return devices.find(d => d.characteristic === ch);
+  }
+
+  function removeDevice(deviceId) {
+    devices = devices.filter(d => d.device && d.device.id !== deviceId);
+    updateDeviceList();
+    updateButtonsState();
+
+    if (devices.length === 0) {
+      setStatus('狀態: 已全部斷線');
+    } else {
+      setStatus(`狀態: 剩餘 ${devices.length} 台裝置連線中`);
+    }
+  }
+
+  async function writeToAll(msg) {
+    if (devices.length === 0) {
+      throw new Error('目前沒有任何已連線裝置');
+    }
 
     const data = new TextEncoder().encode(msg);
-    if (characteristic.writeValueWithResponse) {
-      await characteristic.writeValueWithResponse(data);
-    } else {
-      await characteristic.writeValue(data);
+
+    for (const item of devices) {
+      if (item.characteristic.writeValueWithResponse) {
+        await item.characteristic.writeValueWithResponse(data);
+      } else {
+        await item.characteristic.writeValue(data);
+      }
+    }
+  }
+
+  function handleNotifyValue(event) {
+    const ch = event.target;
+    const value = new TextDecoder().decode(ch.value);
+    const deviceObj = findDeviceByCharacteristic(ch);
+
+    if (!deviceObj) return;
+
+    console.log('Notify from', deviceObj.device?.name, value);
+
+    if (value === 'AUTH_OK') {
+      deviceObj.isAuthed = true;
+
+      if (waitingAuth) {
+        authOkCount++;
+        if (authOkCount + authFailCount >= authExpectedCount) {
+          waitingAuth = false;
+          updateDeviceList();
+          updateButtonsState();
+
+          if (authFailCount === 0 && allAuthed()) {
+            lastAuthResult = 'success';
+            closeAuthModal();
+            setStatus('狀態: 所有裝置驗證成功');
+            showResultModal('success', '驗證成功', '所有已連線裝置都驗證成功。');
+          } else {
+            lastAuthResult = 'fail';
+            closeAuthModal();
+            setStatus('狀態: 部分裝置驗證失敗');
+            showResultModal('error', '驗證失敗', '部分裝置驗證失敗，請重新輸入驗證碼。');
+          }
+        }
+      }
+
+      updateDeviceList();
+      updateButtonsState();
+      return;
+    }
+
+    if (value === 'AUTH_FAIL') {
+      deviceObj.isAuthed = false;
+
+      if (waitingAuth) {
+        authFailCount++;
+        if (authOkCount + authFailCount >= authExpectedCount) {
+          waitingAuth = false;
+          updateDeviceList();
+          updateButtonsState();
+
+          lastAuthResult = 'fail';
+          closeAuthModal();
+          setStatus('狀態: 部分裝置驗證失敗');
+          showResultModal('error', '驗證失敗', '部分裝置驗證失敗，請重新輸入驗證碼。');
+        }
+      }
+
+      updateDeviceList();
+      updateButtonsState();
+      return;
+    }
+
+    if (value === 'AUTH_REQUIRED') {
+      deviceObj.isAuthed = false;
+      updateDeviceList();
+      updateButtonsState();
     }
   }
 
   async function connectBle() {
     try {
-      setStatus('正在搜尋裝置...');
-      device = await navigator.bluetooth.requestDevice({
-        filters: [{ namePrefix: 'ESP32' }],
+      setStatus('狀態: 正在搜尋裝置...');
+
+      const device = await navigator.bluetooth.requestDevice({
+        filters: [{ namePrefix: 'maho' }],
         optionalServices: [SERVICE_UUID]
       });
 
-      device.addEventListener('gattserverdisconnected', () => {
-        characteristic = null;
-        setButtonsDisabled(true);
-        setStatus('已斷線');
+      if (isAlreadyConnected(device.id)) {
+        setStatus(`狀態: ${device.name || '裝置'} 已經連線過了`);
+        return;
+      }
+
+      const server = await device.gatt.connect();
+      const service = await server.getPrimaryService(SERVICE_UUID);
+      const characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+
+      await characteristic.startNotifications();
+      characteristic.addEventListener('characteristicvaluechanged', handleNotifyValue);
+
+      const disconnectHandler = () => {
+        removeDevice(device.id);
+      };
+      device.addEventListener('gattserverdisconnected', disconnectHandler);
+
+      devices.push({
+        device,
+        server,
+        characteristic,
+        isAuthed: false
       });
 
-      server = await device.gatt.connect();
-      const service = await server.getPrimaryService(SERVICE_UUID);
-      characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+      updateDeviceList();
+      updateButtonsState();
+      setStatus(`狀態: 連線成功，目前共 ${devices.length} 台裝置`);
 
-      setButtonsDisabled(false);
-      setStatus('連線成功: ' + (device.name || 'ESP32'));
     } catch (error) {
       console.error(error);
+
+      if (error && (error.name === 'NotFoundError' || /cancelled/i.test(error.message))) {
+        setStatus('狀態: 已取消裝置選擇');
+        return;
+      }
+
       setStatus('錯誤: ' + error.message);
+      showResultModal('error', '連線失敗', error.message);
     }
   }
 
-  async function sendData() {
-    if (!characteristic) return;
-    const msg = document.getElementById('msgInput').value.trim();
-    if (!msg) return;
+  async function submitAuthCode() {
+    const code = document.getElementById('authCodeInput').value.trim();
+
+    if (!code) {
+      showResultModal('error', '驗證失敗', '請輸入驗證碼。');
+      return;
+    }
+
+    if (devices.length === 0) {
+      showResultModal('error', '驗證失敗', '目前沒有已連線裝置。');
+      return;
+    }
 
     try {
-      await writeMessage(msg);
-      alert('已發送: ' + msg);
+      for (const d of devices) {
+        d.isAuthed = false;
+      }
+      updateDeviceList();
+      updateButtonsState();
+
+      waitingAuth = true;
+      authExpectedCount = devices.length;
+      authOkCount = 0;
+      authFailCount = 0;
+
+      setStatus(`狀態: 正在驗證 ${devices.length} 台裝置...`);
+      await writeToAll('AUTH:' + code);
+
     } catch (error) {
-      alert('發送失敗: ' + error.message);
-    }
-  }
-
-  async function sendPreset(number) {
-    if (!characteristic) return;
-
-    try {
-      await writeMessage(String(number));
-      setStatus('已發送數字: ' + number);
-    } catch (error) {
-      alert('發送失敗: ' + error.message);
-    }
-  }
-</script>
-
-</body>
-</html>
+      waitingAuth = false;
+      setStatus('
